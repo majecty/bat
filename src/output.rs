@@ -26,11 +26,21 @@ impl OutputType {
 
     /// Try to launch the pager. Fall back to stdout in case of errors.
     fn try_pager(quit_if_one_screen: bool, pager_from_config: Option<&str>) -> Result<Self> {
-        let pager_from_env = env::var("BAT_PAGER").or_else(|_| env::var("PAGER"));
+        let pager_from_env = match (env::var("BAT_PAGER"), env::var("PAGER")) {
+            (Ok(bat_pager), _) => Some(bat_pager),
+            (_, Ok(pager)) => {
+                if PathBuf::from(pager.clone()).file_stem() == Some(&OsString::from("less")) {
+                    Some(String::from("less"))
+                } else {
+                    Some(pager)
+                }
+            }
+            _ => None,
+        };
 
         let pager = pager_from_config
             .map(|p| p.to_string())
-            .or(pager_from_env.ok())
+            .or(pager_from_env)
             .unwrap_or(String::from("less"));
 
         let pagerflags = shell_words::split(&pager)
